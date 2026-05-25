@@ -5,7 +5,6 @@ import {
   ExternalLink,
   FileUp,
   ImagePlus,
-  Library,
   Plus,
   Search,
   Trash2,
@@ -219,8 +218,7 @@ function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExpo
     <aside className="sidebar" aria-label="Biblioteca de trabajos">
       <div className="brand">
         <div>
-          <p className="eyebrow">Archivo local</p>
-          <h1>Hub de Trabajos Cientificos</h1>
+          <h1>Trabajos Cientificos</h1>
         </div>
         <button className="icon-button primary" type="button" title="Nuevo trabajo" onClick={onNew}>
           <Plus size={21} aria-hidden="true" />
@@ -267,12 +265,11 @@ function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExpo
               onClick={() => onOpen(paper.id)}
             >
               <strong>{paper.title || "Sin titulo"}</strong>
-              <span>{paper.authors || "Sin autores cargados"}</span>
-              <small className="status-pill">{paper.status || "Idea"}</small>
+              {paper.authors ? <span>{paper.authors}</span> : null}
             </button>
           ))
         ) : (
-          <p className="muted-copy">No hay trabajos que coincidan con la busqueda.</p>
+          <p className="muted-copy">Sin resultados.</p>
         )}
       </div>
     </aside>
@@ -282,39 +279,43 @@ function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExpo
 function OpenTabs({ openPapers, activeId, activeLink, onActivate, onClose }) {
   return (
     <section className="topbar" aria-label="Trabajos abiertos">
-      <div className="tabs" role="tablist">
-        {openPapers.map((paper) => (
-          <button
-            key={paper.id}
-            className={`tab ${paper.id === activeId ? "active" : ""}`}
-            type="button"
-            role="tab"
-            aria-selected={paper.id === activeId}
-            onClick={() => onActivate(paper.id)}
-          >
-            <span className="tab-title">{paper.title || "Sin titulo"}</span>
-            <span
-              className="tab-close"
-              role="button"
-              tabIndex={0}
-              aria-label="Cerrar pestana"
-              onClick={(event) => {
-                event.stopPropagation();
-                onClose(paper.id);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
+      {openPapers.length > 1 ? (
+        <div className="tabs" role="tablist">
+          {openPapers.map((paper) => (
+            <button
+              key={paper.id}
+              className={`tab ${paper.id === activeId ? "active" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={paper.id === activeId}
+              onClick={() => onActivate(paper.id)}
+            >
+              <span className="tab-title">{paper.title || "Sin titulo"}</span>
+              <span
+                className="tab-close"
+                role="button"
+                tabIndex={0}
+                aria-label="Cerrar pestana"
+                onClick={(event) => {
                   event.stopPropagation();
                   onClose(paper.id);
-                }
-              }}
-            >
-              <X size={14} aria-hidden="true" />
-            </span>
-          </button>
-        ))}
-      </div>
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onClose(paper.id);
+                  }
+                }}
+              >
+                <X size={14} aria-hidden="true" />
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div />
+      )}
 
       <a
         className={`doc-link ${activeLink ? "" : "disabled"}`}
@@ -478,9 +479,8 @@ function MediaEditor({ items, onUpdate, onRemove }) {
 function PreviewPanel({ paper }) {
   return (
     <aside className="preview-panel" aria-label="Vista previa">
-      <p className="eyebrow">Vista rapida</p>
       <h2>{paper.title || "Sin titulo"}</h2>
-      <p className="preview-meta">{[paper.authors, paper.status].filter(Boolean).join(" | ") || "Sin metadatos"}</p>
+      <p className="preview-meta">{[paper.authors, paper.status].filter(Boolean).join(" | ")}</p>
       <p className="preview-abstract">{paper.abstract || "Todavia no hay abstract cargado."}</p>
       <div className="tag-row">
         {(paper.tags ?? []).map((tag) => (
@@ -527,13 +527,8 @@ function MediaPreview({ item }) {
 function EmptyState() {
   return (
     <section className="empty-state">
-      <p className="eyebrow">MVP listo para usar</p>
-      <Library size={34} aria-hidden="true" />
-      <h2>Selecciona o crea un trabajo para empezar.</h2>
-      <p>
-        Los datos quedan guardados en este navegador mediante localStorage. La exportacion JSON deja
-        preparado el camino para migrar luego a Supabase.
-      </p>
+      <h2>Sin trabajo seleccionado</h2>
+      <p>Elegí un trabajo de la lista o creá uno nuevo.</p>
     </section>
   );
 }
