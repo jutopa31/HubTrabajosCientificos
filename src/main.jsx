@@ -231,10 +231,11 @@ function App() {
       );
 
       // Debounce Supabase write so rapid typing doesn't flood the DB
+      // Must await — Supabase JS v2 queries are lazy and won't fire without .then() / await
       const updated = next.find((p) => p.id === id);
       clearTimeout(updateTimers.current[id]);
-      updateTimers.current[id] = setTimeout(() => {
-        supabase.from("papers").update(toDb(updated)).eq("id", id);
+      updateTimers.current[id] = setTimeout(async () => {
+        await supabase.from("papers").update(toDb(updated)).eq("id", id);
       }, 800);
 
       return next;
