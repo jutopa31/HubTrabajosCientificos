@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
   X
 } from "lucide-react";
 import { supabase } from "./supabase.js";
@@ -526,6 +527,21 @@ function DetailView({ paper, onUpdate, onDelete }) {
     });
   }
 
+  async function uploadFile(index, file) {
+    const ext = file.name.split(".").pop();
+    const path = `${paper.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const type = file.type.startsWith("video/") ? "video" : "image";
+
+    const { error } = await supabase.storage.from("media").upload(path, file);
+    if (error) {
+      window.alert("Error al subir el archivo: " + error.message);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+    updateMedia(index, { url: publicUrl, type });
+  }
+
   if (!isEditing) {
     return (
       <PaperSummary
@@ -613,48 +629,84 @@ function DetailView({ paper, onUpdate, onDelete }) {
               Agregar
             </button>
           </div>
-          <MediaEditor items={paper.media ?? []} onUpdate={updateMedia} onRemove={removeMedia} />
+          <MediaEditor items={paper.media ?? []} onUpdate={updateMedia} onRemove={removeMedia} onUpload={uploadFile} />
         </div>
       </form>
     </section>
   );
 }
 
-function MediaEditor({ items, onUpdate, onRemove }) {
+function MediaEditor({ items, onUpdate, onRemove, onUpload }) {
+  const [uploadingIndices, setUploadingIndices] = useState(new Set());
+
+  async function handleFileChange(index, file) {
+    if (!file) return;
+    setUploadingIndices((prev) => new Set([...prev, index]));
+    await onUpload(index, file);
+    setUploadingIndices((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
+
   if (!items.length) {
-    return <p className="muted-copy">Agrega URLs de imagenes, YouTube, Vimeo o videos directos.</p>;
+    return <p className="muted-copy">Agrega una URL o subí un archivo desde tu dispositivo.</p>;
   }
 
   return (
     <div className="media-list">
-      {items.map((item, index) => (
-        <div className="media-row" key={`${index}-${item.type}`}>
-          <select
-            value={item.type}
-            aria-label="Tipo de recurso"
-            onChange={(event) => onUpdate(index, { type: event.target.value })}
-          >
-            <option value="image">Imagen</option>
-            <option value="video">Video</option>
-          </select>
-          <input
-            value={item.url}
-            type="url"
-            placeholder="URL de imagen o video"
-            aria-label="URL de recurso"
-            onChange={(event) => onUpdate(index, { url: event.target.value })}
-          />
-          <input
-            value={item.caption}
-            placeholder="Descripcion breve"
-            aria-label="Descripcion"
-            onChange={(event) => onUpdate(index, { caption: event.target.value })}
-          />
-          <button className="icon-button" type="button" title="Quitar recurso" onClick={() => onRemove(index)}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-      ))}
+      {items.map((item, index) => {
+        const isUploading = uploadingIndices.has(index);
+        return (
+          <div className="media-row" key={`${index}-${item.type}`}>
+            <select
+              value={item.type}
+              aria-label="Tipo de recurso"
+              onChange={(event) => onUpdate(index, { type: event.target.value })}
+            >
+              <option value="image">Imagen</option>
+              <option value="video">Video</option>
+            </select>
+
+            <div className="media-url-group">
+              <input
+                value={item.url}
+                type="url"
+                placeholder="URL o subí un archivo →"
+                aria-label="URL de recurso"
+                onChange={(event) => onUpdate(index, { url: event.target.value })}
+              />
+              <label
+                className={`icon-button upload-btn ${isUploading ? "uploading" : ""}`}
+                title={isUploading ? "Subiendo..." : "Subir archivo"}
+              >
+                {isUploading ? (
+                  <span className="spinner" aria-hidden="true" />
+                ) : (
+                  <Upload size={15} aria-hidden="true" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*,video/mp4,video/webm,video/ogg,video/quicktime"
+                  disabled={isUploading}
+                  onChange={(e) => handleFileChange(index, e.target.files?.[0])}
+                />
+              </label>
+            </div>
+
+            <input
+              value={item.caption}
+              placeholder="Descripcion breve"
+              aria-label="Descripcion"
+              onChange={(event) => onUpdate(index, { caption: event.target.value })}
+            />
+            <button className="icon-button" type="button" title="Quitar recurso" onClick={() => onRemove(index)}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
