@@ -497,8 +497,8 @@ select:focus {
 }
 
 .summary-header h2 {
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 1.05;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  line-height: 1.25;
 }
 
 .summary-block {
