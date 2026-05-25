@@ -106,6 +106,12 @@ h2 {
   border-color: var(--accent);
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+  transform: none;
+}
+
 .icon-button.primary {
   color: white;
   border-color: var(--accent);
@@ -411,6 +417,60 @@ select:focus {
   gap: 10px;
 }
 
+.authors-section {
+  display: grid;
+  gap: 10px;
+}
+
+.author-list {
+  display: grid;
+  gap: 10px;
+}
+
+.author-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.author-order {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  background: rgba(13, 107, 95, 0.08);
+  font-weight: 700;
+}
+
+.author-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.author-actions .icon-button {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+}
+
+.empty-inline-button {
+  min-height: 42px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+}
+
+.empty-inline-button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
 .media-row {
   display: grid;
   grid-template-columns: 115px minmax(0, 1.2fr) minmax(0, 0.8fr) 38px;
@@ -510,8 +570,13 @@ select:focus {
   .topbar,
   .form-header,
   .field-grid,
+  .author-row,
   .media-row {
     grid-template-columns: 1fr;
+  }
+
+  .author-actions {
+    justify-content: flex-start;
   }
 
   .topbar {

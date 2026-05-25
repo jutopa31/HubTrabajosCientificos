@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  ArrowDown,
+  ArrowUp,
   Download,
   ExternalLink,
   FileUp,
@@ -19,7 +21,7 @@ const seedPapers = [
   {
     id: crypto.randomUUID(),
     title: "Impacto de la inteligencia artificial en el triaje clinico",
-    authors: "Jutopa, Julian; Equipo de investigacion",
+    authors: ["Jutopa, Julian", "Equipo de investigacion"],
     status: "En redaccion",
     link: "https://docs.google.com/",
     tags: ["IA", "triaje", "salud digital"],
@@ -54,11 +56,28 @@ function normalizeTags(value) {
     .filter(Boolean);
 }
 
+function normalizeAuthors(value) {
+  if (Array.isArray(value)) return value.map((author) => String(author).trim()).filter(Boolean);
+  return String(value)
+    .split(";")
+    .map((author) => author.trim())
+    .filter(Boolean);
+}
+
+function editorAuthors(value) {
+  if (Array.isArray(value)) return value.map((author) => String(author));
+  return normalizeAuthors(value);
+}
+
+function formatAuthors(authors) {
+  return normalizeAuthors(authors).join("; ");
+}
+
 function createBlankPaper() {
   return {
     id: crypto.randomUUID(),
     title: "Nuevo trabajo sin titulo",
-    authors: "",
+    authors: [],
     status: "Idea",
     link: "",
     tags: [],
@@ -90,7 +109,7 @@ function App() {
     return papers.filter((paper) => {
       const haystack = [
         paper.title,
-        paper.authors,
+        formatAuthors(paper.authors),
         paper.status,
         paper.abstract,
         ...(paper.tags ?? [])
@@ -164,7 +183,7 @@ function App() {
       const nextPapers = imported.map((paper) => ({
         id: paper.id || crypto.randomUUID(),
         title: paper.title || "Sin titulo",
-        authors: paper.authors || "",
+        authors: normalizeAuthors(paper.authors || []),
         status: STATUSES.includes(paper.status) ? paper.status : "Idea",
         link: paper.link || "",
         tags: normalizeTags(paper.tags || []),
@@ -265,7 +284,7 @@ function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExpo
               onClick={() => onOpen(paper.id)}
             >
               <strong>{paper.title || "Sin titulo"}</strong>
-              {paper.authors ? <span>{paper.authors}</span> : null}
+              {formatAuthors(paper.authors) ? <span>{formatAuthors(paper.authors)}</span> : null}
             </button>
           ))
         ) : (
@@ -376,14 +395,6 @@ function DetailView({ paper, onUpdate, onDelete }) {
 
         <div className="field-grid">
           <label>
-            Autores
-            <input
-              value={paper.authors}
-              placeholder="Apellido, Nombre; ..."
-              onChange={(event) => updateField("authors", event.target.value)}
-            />
-          </label>
-          <label>
             Estado
             <select value={paper.status} onChange={(event) => updateField("status", event.target.value)}>
               {STATUSES.map((status) => (
@@ -409,6 +420,8 @@ function DetailView({ paper, onUpdate, onDelete }) {
             />
           </label>
         </div>
+
+        <AuthorsEditor authors={editorAuthors(paper.authors)} onChange={(authors) => updateField("authors", authors)} />
 
         <label>
           Abstract
@@ -480,7 +493,7 @@ function PreviewPanel({ paper }) {
   return (
     <aside className="preview-panel" aria-label="Vista previa">
       <h2>{paper.title || "Sin titulo"}</h2>
-      <p className="preview-meta">{[paper.authors, paper.status].filter(Boolean).join(" | ")}</p>
+      <p className="preview-meta">{[formatAuthors(paper.authors), paper.status].filter(Boolean).join(" | ")}</p>
       <p className="preview-abstract">{paper.abstract || "Todavia no hay abstract cargado."}</p>
       <div className="tag-row">
         {(paper.tags ?? []).map((tag) => (
@@ -529,6 +542,92 @@ function EmptyState() {
     <section className="empty-state">
       <h2>Sin trabajo seleccionado</h2>
       <p>Elegí un trabajo de la lista o creá uno nuevo.</p>
+    </section>
+  );
+}
+
+function AuthorsEditor({ authors, onChange }) {
+  function updateAuthor(index, value) {
+    const next = [...authors];
+    next[index] = value;
+    onChange(next);
+  }
+
+  function addAuthor() {
+    onChange([...authors, ""]);
+  }
+
+  function removeAuthor(index) {
+    onChange(authors.filter((_, authorIndex) => authorIndex !== index));
+  }
+
+  function moveAuthor(index, direction) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= authors.length) return;
+
+    const next = [...authors];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    onChange(next);
+  }
+
+  return (
+    <section className="authors-section" aria-label="Autores">
+      <div className="section-title">
+        <h2>Autores</h2>
+        <button className="ghost-button compact" type="button" onClick={addAuthor}>
+          <Plus size={16} aria-hidden="true" />
+          Agregar
+        </button>
+      </div>
+
+      {authors.length ? (
+        <div className="author-list">
+          {authors.map((author, index) => (
+            <div className="author-row" key={index}>
+              <span className="author-order">{index + 1}</span>
+              <input
+                value={author}
+                placeholder="Apellido, Nombre"
+                aria-label={`Autor ${index + 1}`}
+                onChange={(event) => updateAuthor(index, event.target.value)}
+                onBlur={() => onChange(normalizeAuthors(authors))}
+              />
+              <div className="author-actions">
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Subir autor"
+                  disabled={index === 0}
+                  onClick={() => moveAuthor(index, -1)}
+                >
+                  <ArrowUp size={15} aria-hidden="true" />
+                </button>
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Bajar autor"
+                  disabled={index === authors.length - 1}
+                  onClick={() => moveAuthor(index, 1)}
+                >
+                  <ArrowDown size={15} aria-hidden="true" />
+                </button>
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Quitar autor"
+                  onClick={() => removeAuthor(index)}
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <button className="empty-inline-button" type="button" onClick={addAuthor}>
+          Agregar autor
+        </button>
+      )}
     </section>
   );
 }
