@@ -361,13 +361,11 @@ select:focus {
 
 .detail-view {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 18px;
   align-items: start;
 }
 
 .paper-form,
-.preview-panel {
+.paper-summary {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 250, 241, 0.94);
@@ -385,6 +383,13 @@ select:focus {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: end;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .title-input {
@@ -477,17 +482,47 @@ select:focus {
   gap: 10px;
 }
 
-.preview-panel {
-  position: sticky;
-  top: 18px;
+.paper-summary {
   display: grid;
-  gap: 12px;
-  padding: 20px;
+  gap: 22px;
+  max-width: 980px;
+  padding: 28px;
 }
 
-.preview-panel h2 {
-  font-size: 1.7rem;
+.summary-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+
+.summary-header h2 {
+  font-size: clamp(2rem, 5vw, 4rem);
   line-height: 1.05;
+}
+
+.summary-block {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-block h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ordered-authors {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.ordered-authors li {
+  line-height: 1.45;
 }
 
 .preview-meta,
@@ -495,6 +530,20 @@ select:focus {
   margin: 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.summary-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.summary-link:hover {
+  text-decoration: underline;
 }
 
 .tag-row {
@@ -514,7 +563,12 @@ select:focus {
 
 .preview-media {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.compact-media {
+  max-width: 900px;
 }
 
 .media-preview-item {
@@ -550,10 +604,6 @@ select:focus {
   .detail-view {
     grid-template-columns: 1fr;
   }
-
-  .preview-panel {
-    position: static;
-  }
 }
 
 @media (max-width: 760px) {
@@ -569,10 +619,15 @@ select:focus {
 
   .topbar,
   .form-header,
+  .summary-header,
   .field-grid,
   .author-row,
   .media-row {
     grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    justify-content: flex-start;
   }
 
   .author-actions {

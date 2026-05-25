@@ -3,10 +3,12 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   Download,
   ExternalLink,
   FileUp,
   ImagePlus,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -85,6 +87,15 @@ function createBlankPaper() {
     media: [],
     updatedAt: new Date().toISOString()
   };
+}
+
+function isDraftPaper(paper) {
+  return (
+    paper.title === "Nuevo trabajo sin titulo" &&
+    !formatAuthors(paper.authors) &&
+    !paper.abstract &&
+    !(paper.media ?? []).length
+  );
 }
 
 function App() {
@@ -351,6 +362,12 @@ function OpenTabs({ openPapers, activeId, activeLink, onActivate, onClose }) {
 }
 
 function DetailView({ paper, onUpdate, onDelete }) {
+  const [isEditing, setIsEditing] = useState(() => isDraftPaper(paper));
+
+  useEffect(() => {
+    setIsEditing(isDraftPaper(paper));
+  }, [paper.id]);
+
   function updateField(field, value) {
     onUpdate(paper.id, { [field]: value });
   }
@@ -373,8 +390,18 @@ function DetailView({ paper, onUpdate, onDelete }) {
     });
   }
 
+  if (!isEditing) {
+    return (
+      <PaperSummary
+        paper={paper}
+        onEdit={() => setIsEditing(true)}
+        onDelete={() => onDelete(paper.id)}
+      />
+    );
+  }
+
   return (
-    <section className="detail-view">
+    <section className="detail-view edit-mode">
       <form className="paper-form" onSubmit={(event) => event.preventDefault()}>
         <div className="form-header">
           <label>
@@ -387,10 +414,16 @@ function DetailView({ paper, onUpdate, onDelete }) {
               onChange={(event) => updateField("title", event.target.value)}
             />
           </label>
-          <button className="danger-button" type="button" onClick={() => onDelete(paper.id)}>
-            <Trash2 size={16} aria-hidden="true" />
-            Eliminar
-          </button>
+          <div className="form-actions">
+            <button className="ghost-button" type="button" onClick={() => setIsEditing(false)}>
+              <Check size={16} aria-hidden="true" />
+              Listo
+            </button>
+            <button className="danger-button" type="button" onClick={() => onDelete(paper.id)}>
+              <Trash2 size={16} aria-hidden="true" />
+              Eliminar
+            </button>
+          </div>
         </div>
 
         <div className="field-grid">
@@ -444,8 +477,6 @@ function DetailView({ paper, onUpdate, onDelete }) {
           <MediaEditor items={paper.media ?? []} onUpdate={updateMedia} onRemove={removeMedia} />
         </div>
       </form>
-
-      <PreviewPanel paper={paper} />
     </section>
   );
 }
@@ -489,27 +520,77 @@ function MediaEditor({ items, onUpdate, onRemove }) {
   );
 }
 
-function PreviewPanel({ paper }) {
+function PaperSummary({ paper, onEdit, onDelete }) {
+  const authors = normalizeAuthors(paper.authors);
+  const abstractPreview = paper.abstract?.trim()
+    ? paper.abstract.trim().slice(0, 520)
+    : "Sin abstract cargado.";
+  const hasMoreAbstract = paper.abstract?.trim().length > 520;
+  const mediaItems = (paper.media ?? []).filter((item) => item.url);
+
   return (
-    <aside className="preview-panel" aria-label="Vista previa">
-      <h2>{paper.title || "Sin titulo"}</h2>
-      <p className="preview-meta">{[formatAuthors(paper.authors), paper.status].filter(Boolean).join(" | ")}</p>
-      <p className="preview-abstract">{paper.abstract || "Todavia no hay abstract cargado."}</p>
-      <div className="tag-row">
-        {(paper.tags ?? []).map((tag) => (
-          <span className="tag" key={tag}>
-            {tag}
-          </span>
-        ))}
+    <section className="paper-summary" aria-label="Detalle del trabajo">
+      <div className="summary-header">
+        <div>
+          <h2>{paper.title || "Sin titulo"}</h2>
+          <p className="preview-meta">{paper.status}</p>
+        </div>
+        <div className="form-actions">
+          <button className="ghost-button" type="button" onClick={onEdit}>
+            <Pencil size={16} aria-hidden="true" />
+            Editar
+          </button>
+          <button className="danger-button" type="button" onClick={onDelete}>
+            <Trash2 size={16} aria-hidden="true" />
+            Eliminar
+          </button>
+        </div>
       </div>
-      <div className="preview-media">
-        {(paper.media ?? [])
-          .filter((item) => item.url)
-          .map((item, index) => (
+
+      {authors.length ? (
+        <section className="summary-block">
+          <h3>Autores</h3>
+          <ol className="ordered-authors">
+            {authors.map((author, index) => (
+              <li key={`${author}-${index}`}>{author}</li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      <section className="summary-block">
+        <h3>Abstract</h3>
+        <p className="preview-abstract">
+          {abstractPreview}
+          {hasMoreAbstract ? "..." : ""}
+        </p>
+      </section>
+
+      {(paper.tags ?? []).length ? (
+        <div className="tag-row">
+          {(paper.tags ?? []).map((tag) => (
+            <span className="tag" key={tag}>
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {paper.link ? (
+        <a className="summary-link" href={paper.link} target="_blank" rel="noreferrer">
+          <ExternalLink size={16} aria-hidden="true" />
+          Abrir documento
+        </a>
+      ) : null}
+
+      {mediaItems.length ? (
+        <div className="preview-media compact-media">
+          {mediaItems.slice(0, 3).map((item, index) => (
             <MediaPreview item={item} key={`${item.url}-${index}`} />
           ))}
-      </div>
-    </aside>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
