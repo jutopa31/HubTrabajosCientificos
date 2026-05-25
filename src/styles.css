@@ -606,6 +606,22 @@ select:focus {
   }
 }
 
+.loading-screen {
+  display: grid;
+  place-items: center;
+  place-content: center;
+  gap: 12px;
+  min-height: 100vh;
+  text-align: center;
+  padding: 32px;
+}
+
+.error-text {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDown,
@@ -14,56 +14,61 @@ import {
   Trash2,
   X
 } from "lucide-react";
+import { supabase } from "./supabase.js";
 import "./styles.css";
 
-const STORAGE_KEY = "hub-trabajos-cientificos:v1";
+const LEGACY_KEY = "hub-trabajos-cientificos:v1";
 const STATUSES = ["Idea", "En redaccion", "Revision", "Enviado", "Publicado"];
 
-const seedPapers = [
-  {
-    id: crypto.randomUUID(),
-    title: "Impacto de la inteligencia artificial en el triaje clinico",
-    authors: ["Jutopa, Julian", "Equipo de investigacion"],
-    status: "En redaccion",
-    link: "https://docs.google.com/",
-    tags: ["IA", "triaje", "salud digital"],
-    abstract:
-      "Trabajo exploratorio sobre el uso de modelos de lenguaje para priorizacion inicial de pacientes, con foco en seguridad, trazabilidad y supervision clinica.",
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80",
-        caption: "Referencia visual para salud digital y analisis clinico."
-      }
-    ],
-    updatedAt: new Date().toISOString()
-  }
-];
+// ── DB mappers ────────────────────────────────────────────────────────────────
 
-function loadPapers() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? parsed : seedPapers;
-  } catch {
-    return seedPapers;
-  }
+function fromDb(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    authors: row.authors ?? [],
+    status: row.status,
+    link: row.link ?? "",
+    tags: row.tags ?? [],
+    abstract: row.abstract ?? "",
+    media: row.media ?? [],
+    updatedAt: row.updated_at,
+  };
 }
+
+function toDb(paper) {
+  return {
+    id: paper.id,
+    title: paper.title,
+    authors: paper.authors,
+    status: paper.status,
+    link: paper.link,
+    tags: paper.tags,
+    abstract: paper.abstract,
+    media: paper.media,
+    updated_at: paper.updatedAt,
+  };
+}
+
+function tryLoadLegacy() {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {}
+  return [];
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeTags(value) {
   if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean);
-  return String(value)
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  return String(value).split(",").map((tag) => tag.trim()).filter(Boolean);
 }
 
 function normalizeAuthors(value) {
   if (Array.isArray(value)) return value.map((author) => String(author).trim()).filter(Boolean);
-  return String(value)
-    .split(";")
-    .map((author) => author.trim())
-    .filter(Boolean);
+  return String(value).split(";").map((author) => author.trim()).filter(Boolean);
 }
 
 function editorAuthors(value) {
@@ -85,7 +90,7 @@ function createBlankPaper() {
     tags: [],
     abstract: "",
     media: [],
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -98,15 +103,61 @@ function isDraftPaper(paper) {
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
+
 function App() {
-  const [papers, setPapers] = useState(loadPapers);
-  const [openIds, setOpenIds] = useState(() => (papers[0] ? [papers[0].id] : []));
-  const [activeId, setActiveId] = useState(() => papers[0]?.id ?? null);
+  const [papers, setPapers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openIds, setOpenIds] = useState([]);
+  const [activeId, setActiveId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const updateTimers = useRef({});
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(papers));
-  }, [papers]);
+    loadPapers();
+  }, []);
+
+  async function loadPapers() {
+    setLoading(true);
+    setError(null);
+
+    const { data, error: fetchError } = await supabase
+      .from("papers")
+      .select("*")
+      .order("updated_at", { ascending: false });
+
+    if (fetchError) {
+      setError(fetchError.message);
+      setLoading(false);
+      return;
+    }
+
+    let loaded = (data ?? []).map(fromDb);
+
+    // One-time migration from localStorage
+    if (loaded.length === 0) {
+      const legacy = tryLoadLegacy();
+      if (legacy.length > 0) {
+        const { data: migrated, error: migrateError } = await supabase
+          .from("papers")
+          .insert(legacy.map(toDb))
+          .select();
+
+        if (!migrateError) {
+          localStorage.removeItem(LEGACY_KEY);
+          loaded = (migrated ?? []).map(fromDb);
+        }
+      }
+    }
+
+    setPapers(loaded);
+    if (loaded[0]) {
+      setOpenIds([loaded[0].id]);
+      setActiveId(loaded[0].id);
+    }
+    setLoading(false);
+  }
 
   const activePaper = useMemo(
     () => papers.find((paper) => paper.id === activeId) ?? null,
@@ -116,14 +167,13 @@ function App() {
   const filteredPapers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return papers;
-
     return papers.filter((paper) => {
       const haystack = [
         paper.title,
         formatAuthors(paper.authors),
         paper.status,
         paper.abstract,
-        ...(paper.tags ?? [])
+        ...(paper.tags ?? []),
       ]
         .join(" ")
         .toLowerCase();
@@ -144,27 +194,70 @@ function App() {
     });
   }
 
-  function addPaper() {
+  async function addPaper() {
     const paper = createBlankPaper();
+
+    // Optimistic: show immediately while Supabase persists
     setPapers((current) => [paper, ...current]);
     setOpenIds((current) => [paper.id, ...current]);
     setActiveId(paper.id);
+
+    const { data, error: insertError } = await supabase
+      .from("papers")
+      .insert(toDb(paper))
+      .select()
+      .single();
+
+    if (insertError) {
+      setPapers((current) => current.filter((p) => p.id !== paper.id));
+      setOpenIds((current) => current.filter((id) => id !== paper.id));
+      setActiveId((current) => (current === paper.id ? null : current));
+      window.alert("Error al crear el trabajo: " + insertError.message);
+      return;
+    }
+
+    // Replace optimistic entry with server-confirmed row
+    const saved = fromDb(data);
+    setPapers((current) => current.map((p) => (p.id === paper.id ? saved : p)));
   }
 
   function updatePaper(id, patch) {
-    setPapers((current) =>
-      current.map((paper) =>
-        paper.id === id ? { ...paper, ...patch, updatedAt: new Date().toISOString() } : paper
-      )
-    );
+    setPapers((current) => {
+      const next = current.map((paper) =>
+        paper.id === id
+          ? { ...paper, ...patch, updatedAt: new Date().toISOString() }
+          : paper
+      );
+
+      // Debounce Supabase write so rapid typing doesn't flood the DB
+      const updated = next.find((p) => p.id === id);
+      clearTimeout(updateTimers.current[id]);
+      updateTimers.current[id] = setTimeout(() => {
+        supabase.from("papers").update(toDb(updated)).eq("id", id);
+      }, 800);
+
+      return next;
+    });
   }
 
-  function deletePaper(id) {
+  async function deletePaper(id) {
     const paper = papers.find((item) => item.id === id);
     if (!paper) return;
 
-    const shouldDelete = window.confirm(`Eliminar "${paper.title}"? Esta accion no se puede deshacer.`);
+    const shouldDelete = window.confirm(
+      `Eliminar "${paper.title}"? Esta accion no se puede deshacer.`
+    );
     if (!shouldDelete) return;
+
+    const { error: deleteError } = await supabase
+      .from("papers")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      window.alert("Error al eliminar: " + deleteError.message);
+      return;
+    }
 
     setPapers((current) => current.filter((item) => item.id !== id));
     setOpenIds((current) => {
@@ -200,15 +293,56 @@ function App() {
         tags: normalizeTags(paper.tags || []),
         abstract: paper.abstract || "",
         media: Array.isArray(paper.media) ? paper.media : [],
-        updatedAt: paper.updatedAt || new Date().toISOString()
+        updatedAt: paper.updatedAt || new Date().toISOString(),
       }));
 
-      setPapers(nextPapers);
-      setOpenIds(nextPapers[0] ? [nextPapers[0].id] : []);
-      setActiveId(nextPapers[0]?.id ?? null);
-    } catch (error) {
-      window.alert(error.message || "No se pudo importar el archivo.");
+      // Delete existing rows by ID, then insert imported ones
+      const existingIds = papers.map((p) => p.id);
+      if (existingIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("papers")
+          .delete()
+          .in("id", existingIds);
+        if (deleteError) throw new Error("Error al limpiar datos: " + deleteError.message);
+      }
+
+      const { data, error: insertError } = await supabase
+        .from("papers")
+        .insert(nextPapers.map(toDb))
+        .select();
+
+      if (insertError) throw new Error("Error al importar: " + insertError.message);
+
+      const saved = (data ?? []).map(fromDb);
+      setPapers(saved);
+      setOpenIds(saved[0] ? [saved[0].id] : []);
+      setActiveId(saved[0]?.id ?? null);
+    } catch (err) {
+      window.alert(err.message || "No se pudo importar el archivo.");
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <p>Cargando trabajos...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="loading-screen">
+        <p className="error-text">Error al conectar con la base de datos:</p>
+        <p className="muted-copy">{error}</p>
+        <p className="muted-copy">
+          Verificá las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el archivo .env
+        </p>
+        <button className="ghost-button" type="button" onClick={loadPapers}>
+          Reintentar
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -242,6 +376,8 @@ function App() {
     </div>
   );
 }
+
+// ── UI components (sin cambios de lógica) ────────────────────────────────────
 
 function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExport, onImport }) {
   return (
@@ -380,13 +516,13 @@ function DetailView({ paper, onUpdate, onDelete }) {
 
   function addMedia() {
     onUpdate(paper.id, {
-      media: [...(paper.media ?? []), { type: "image", url: "", caption: "" }]
+      media: [...(paper.media ?? []), { type: "image", url: "", caption: "" }],
     });
   }
 
   function removeMedia(index) {
     onUpdate(paper.id, {
-      media: (paper.media ?? []).filter((_, itemIndex) => itemIndex !== index)
+      media: (paper.media ?? []).filter((_, itemIndex) => itemIndex !== index),
     });
   }
 
@@ -454,7 +590,10 @@ function DetailView({ paper, onUpdate, onDelete }) {
           </label>
         </div>
 
-        <AuthorsEditor authors={editorAuthors(paper.authors)} onChange={(authors) => updateField("authors", authors)} />
+        <AuthorsEditor
+          authors={editorAuthors(paper.authors)}
+          onChange={(authors) => updateField("authors", authors)}
+        />
 
         <label>
           Abstract
@@ -645,7 +784,6 @@ function AuthorsEditor({ authors, onChange }) {
   function moveAuthor(index, direction) {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= authors.length) return;
-
     const next = [...authors];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     onChange(next);
