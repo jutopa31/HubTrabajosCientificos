@@ -131,7 +131,7 @@ function CountdownBanner() {
   if (!remaining) {
     return (
       <div className="countdown expired">
-        <span className="countdown-label">Presentación</span>
+        <span className="countdown-label">Fecha límite presentación trabajos científicos</span>
         <span className="countdown-value">Tiempo vencido</span>
       </div>
     );
@@ -141,7 +141,7 @@ function CountdownBanner() {
 
   return (
     <div className={`countdown ${urgency}`}>
-      <span className="countdown-label">Presentación</span>
+      <span className="countdown-label">Fecha límite presentación trabajos científicos</span>
       <span className="countdown-value">
         {remaining.days}d {remaining.hours}h
       </span>
