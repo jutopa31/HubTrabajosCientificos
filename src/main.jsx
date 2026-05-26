@@ -33,6 +33,7 @@ function fromDb(row) {
     tags: row.tags ?? [],
     abstract: row.abstract ?? "",
     media: row.media ?? [],
+    bibliography: row.bibliography ?? [],
     updatedAt: row.updated_at,
   };
 }
@@ -47,6 +48,7 @@ function toDb(paper) {
     tags: paper.tags,
     abstract: paper.abstract,
     media: paper.media,
+    bibliography: paper.bibliography ?? [],
     updated_at: paper.updatedAt,
   };
 }
@@ -91,6 +93,7 @@ function createBlankPaper() {
     tags: [],
     abstract: "",
     media: [],
+    bibliography: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -101,6 +104,48 @@ function isDraftPaper(paper) {
     !formatAuthors(paper.authors) &&
     !paper.abstract &&
     !(paper.media ?? []).length
+  );
+}
+
+// ── Countdown ────────────────────────────────────────────────────────────────
+
+const DEADLINE = new Date("2026-08-02T23:00:00-03:00"); // ART
+
+function getRemaining() {
+  const diff = DEADLINE - new Date();
+  if (diff <= 0) return null;
+  return {
+    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+  };
+}
+
+function CountdownBanner() {
+  const [remaining, setRemaining] = useState(getRemaining);
+
+  useEffect(() => {
+    const timer = setInterval(() => setRemaining(getRemaining()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!remaining) {
+    return (
+      <div className="countdown expired">
+        <span className="countdown-label">Presentación</span>
+        <span className="countdown-value">Tiempo vencido</span>
+      </div>
+    );
+  }
+
+  const urgency = remaining.days < 7 ? "urgent" : remaining.days < 30 ? "warning" : "";
+
+  return (
+    <div className={`countdown ${urgency}`}>
+      <span className="countdown-label">Presentación</span>
+      <span className="countdown-value">
+        {remaining.days}d {remaining.hours}h
+      </span>
+    </div>
   );
 }
 
@@ -295,6 +340,7 @@ function App() {
         tags: normalizeTags(paper.tags || []),
         abstract: paper.abstract || "",
         media: Array.isArray(paper.media) ? paper.media : [],
+        bibliography: Array.isArray(paper.bibliography) ? paper.bibliography : [],
         updatedAt: paper.updatedAt || new Date().toISOString(),
       }));
 
@@ -392,6 +438,8 @@ function Sidebar({ papers, activeId, searchTerm, onSearch, onOpen, onNew, onExpo
           <Plus size={21} aria-hidden="true" />
         </button>
       </div>
+
+      <CountdownBanner />
 
       <label className="search-box">
         <span>Buscar</span>
@@ -622,6 +670,11 @@ function DetailView({ paper, onUpdate, onDelete }) {
           />
         </label>
 
+        <BibliographyEditor
+          entries={paper.bibliography ?? []}
+          onChange={(bibliography) => updateField("bibliography", bibliography)}
+        />
+
         <div className="media-section">
           <div className="section-title">
             <h2>Imagenes y videos</h2>
@@ -775,6 +828,25 @@ function PaperSummary({ paper, onEdit, onDelete }) {
         </a>
       ) : null}
 
+      {(paper.bibliography ?? []).length ? (
+        <section className="summary-block">
+          <h3>Bibliografía</h3>
+          <ol className="bib-refs">
+            {(paper.bibliography ?? []).map((entry, index) => (
+              <li key={index}>
+                {entry.url ? (
+                  <a href={entry.url} target="_blank" rel="noreferrer">
+                    {entry.label || entry.url}
+                  </a>
+                ) : (
+                  <span>{entry.label}</span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       {mediaItems.length ? (
         <div className="preview-media compact-media">
           {mediaItems.slice(0, 3).map((item, index) => (
@@ -898,6 +970,62 @@ function AuthorsEditor({ authors, onChange }) {
       ) : (
         <button className="empty-inline-button" type="button" onClick={addAuthor}>
           Agregar autor
+        </button>
+      )}
+    </section>
+  );
+}
+
+function BibliographyEditor({ entries, onChange }) {
+  function addEntry() {
+    onChange([...entries, { label: "", url: "" }]);
+  }
+
+  function updateEntry(index, patch) {
+    const next = [...entries];
+    next[index] = { ...next[index], ...patch };
+    onChange(next);
+  }
+
+  function removeEntry(index) {
+    onChange(entries.filter((_, i) => i !== index));
+  }
+
+  return (
+    <section className="bib-section">
+      <div className="section-title">
+        <h2>Bibliografía</h2>
+        <button className="ghost-button compact" type="button" onClick={addEntry}>
+          <Plus size={16} aria-hidden="true" />
+          Agregar
+        </button>
+      </div>
+      {entries.length ? (
+        <div className="bib-list">
+          {entries.map((entry, index) => (
+            <div className="bib-row" key={index}>
+              <input
+                value={entry.label}
+                placeholder="Referencia (autor, revista, año...)"
+                aria-label="Referencia"
+                onChange={(e) => updateEntry(index, { label: e.target.value })}
+              />
+              <input
+                value={entry.url}
+                type="url"
+                placeholder="https://doi.org/..."
+                aria-label="URL"
+                onChange={(e) => updateEntry(index, { url: e.target.value })}
+              />
+              <button className="icon-button" type="button" title="Quitar referencia" onClick={() => removeEntry(index)}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <button className="empty-inline-button" type="button" onClick={addEntry}>
+          Agregar referencia bibliográfica
         </button>
       )}
     </section>

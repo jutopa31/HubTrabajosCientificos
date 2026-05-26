@@ -644,6 +644,93 @@ select:focus {
   }
 }
 
+/* ── Countdown ── */
+
+.countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(13, 107, 95, 0.06);
+}
+
+.countdown.warning {
+  border-left-color: #b45309;
+  background: rgba(180, 83, 9, 0.06);
+}
+
+.countdown.urgent,
+.countdown.expired {
+  border-left-color: var(--danger);
+  background: rgba(168, 52, 46, 0.06);
+}
+
+.countdown-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.countdown-value {
+  color: var(--accent-strong);
+  font-family: "Literata", serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.countdown.warning .countdown-value {
+  color: #92400e;
+}
+
+.countdown.urgent .countdown-value,
+.countdown.expired .countdown-value {
+  color: var(--danger);
+}
+
+/* ── Bibliografía ── */
+
+.bib-section {
+  display: grid;
+  gap: 10px;
+}
+
+.bib-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bib-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 38px;
+  gap: 10px;
+  align-items: center;
+}
+
+.bib-refs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.bib-refs li {
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.bib-refs a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.bib-refs a:hover {
+  text-decoration: underline;
+}
+
 .loading-screen {
   display: grid;
   place-items: center;
@@ -676,7 +763,8 @@ select:focus {
   .summary-header,
   .field-grid,
   .author-row,
-  .media-row {
+  .media-row,
+  .bib-row {
     grid-template-columns: 1fr;
   }
 
